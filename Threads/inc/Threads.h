@@ -12,6 +12,6 @@ typedef struct {
 
 void *Reader(void *);
 void *Analyzer(void *);
-void *Printer();
+void *Printer(void *);
 
 #endif	// THREADS_TIETO_ASSIGNMENT

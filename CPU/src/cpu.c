@@ -19,7 +19,7 @@ float CalculateCpuUsage(CPUStats prev, CPUStats curr)
 	int totald = Total - PrevTotal;
 	int idled  = Idle - PrevIdle;
 
-	return 100 * (totald - idled) / totald;
+	return 100.f * (float) (totald - idled) / (float) totald;
 }
 
 short GetCoreCount()
@@ -30,7 +30,7 @@ short GetCoreCount()
 		exit(1);
 	}
 	// Count number of cpu cores
-	int cores = 0;
+	short cores = 0;
 	char line[128];
 	while(fgets(line, sizeof(line), file))
 		if(!strncmp(line, "processor", 9))

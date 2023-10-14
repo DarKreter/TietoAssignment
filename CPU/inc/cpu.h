@@ -2,7 +2,7 @@
 #define CPU_TIETO_ASSIGNMENT
 
 typedef struct {
-	short id;
+	int id;
 	int user;
 	int nice;
 	int system;
@@ -16,6 +16,6 @@ typedef struct {
 } CPUStats;
 
 float CalculateCpuUsage(CPUStats, CPUStats);
-short GetCoreCount();
+short GetCoreCount(void);
 
 #endif	// CPU_TIETO_ASSIGNMENT

@@ -22,7 +22,7 @@ void *Reader(void *_pipe)
 		}
 		while(fgets(buffer, sizeof(buffer), file)) {
 			if(!strncmp(buffer, "cpu", 3) && strncmp(buffer, "cpu ", 4)) {
-				sscanf(buffer, "cpu%hd %d %d %d %d %d %d %d %d %d %d", &cpu.id,
+				sscanf(buffer, "cpu%d %d %d %d %d %d %d %d %d %d %d", &cpu.id,
 					   &cpu.user, &cpu.nice, &cpu.system, &cpu.idle,
 					   &cpu.iowait, &cpu.irq, &cpu.softirq, &cpu.steal,
 					   &cpu.guest, &cpu.guest_nice);
@@ -83,7 +83,7 @@ void *Printer(void *arg)
 		pthread_cond_wait(args->condvar, args->mutex);
 
 		for(int i = 0; i < cc; i++)
-			printf("Cpu%i: %f%%\n", i, args->cpus_usage[i]);
+			printf("Cpu%i: %0.1f%%\n", i, args->cpus_usage[i]);
 		printf("\n");
 
 		pthread_mutex_unlock(args->mutex);
