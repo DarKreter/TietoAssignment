@@ -11,7 +11,7 @@ int main()
 {
 	// shared data between Analyzer and Printer
 	float *cpus_usage = malloc(sizeof(float) * (unsigned long) GetCoreCount());
-	pthread_mutex_t analyzerPrinterMutex, watchdogMutex;
+	pthread_mutex_t analyzerPrinterMutex, watchdogMutex, loggerMutex;
 	pthread_cond_t analyzerPrinterCondvar;
 	// Analyzer data
 	CPUStats *cpus =
@@ -19,32 +19,40 @@ int main()
 	// Watchdog table
 	short *alive = malloc(sizeof(short) * THREADS_NUM);
 	alive[0] = alive[1] = alive[2] = alive[3] = 1;
+	// Logger file
+	FILE *lgfl								  = fopen("data.log", "w+");
 
 	// Config and init threads, attr, mutex and condvar
-	pthread_t threads[THREADS_NUM], watchdog;
+	pthread_t threads[THREADS_NUM], watchdog, logger;
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	pthread_mutex_init(&analyzerPrinterMutex, NULL);
 	pthread_mutex_init(&watchdogMutex, NULL);
+	pthread_mutex_init(&loggerMutex, NULL);
 	pthread_cond_init(&analyzerPrinterCondvar, NULL);
 
-	// Create pipe between Reader and Analyzer
-	int pipeReaderAnalyzer[2];
+	// Create pipes
+	int pipeReaderAnalyzer[2], pipeLogger[2];
 	pipe(pipeReaderAnalyzer);
+	pipe(pipeLogger);
 
 	// Pack args for threads
 	ThreadsArgs analyzerArgs = {pipeReaderAnalyzer,
+								pipeLogger,
 								&analyzerPrinterMutex,
 								&watchdogMutex,
+								&loggerMutex,
 								&analyzerPrinterCondvar,
 								cpus_usage,
 								cpus,
 								alive,
-								threads};
+								threads,
+								lgfl};
 	pthread_create(&threads[0], &attr, Reader, (void *) &analyzerArgs);
 	pthread_create(&threads[1], &attr, Analyzer, (void *) &analyzerArgs);
 	pthread_create(&threads[2], &attr, Printer, (void *) &analyzerArgs);
+	pthread_create(&logger, &attr, Logger, (void *) &analyzerArgs);
 	pthread_create(&watchdog, &attr, Watchdog, (void *) &analyzerArgs);
 
 	// Wait for threads
@@ -52,10 +60,15 @@ int main()
 		pthread_join(threads[i], NULL);
 	pthread_join(watchdog, NULL);
 
+	pthread_cancel(logger);
+	pthread_join(logger, NULL);
+
 	// Clean up
+	fclose(lgfl);
 	pthread_attr_destroy(&attr);
 	pthread_mutex_destroy(&analyzerPrinterMutex);
 	pthread_mutex_destroy(&watchdogMutex);
+	pthread_mutex_destroy(&loggerMutex);
 	pthread_cond_destroy(&analyzerPrinterCondvar);
 	free(cpus_usage);
 	free(cpus);
