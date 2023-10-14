@@ -22,7 +22,7 @@ float CalculateCpuUsage(CPUStats prev, CPUStats curr)
 	return 100 * (totald - idled) / totald;
 }
 
-short CheckCoreCount()
+short GetCoreCount()
 {
 	FILE *file = fopen("/proc/cpuinfo", "r");
 	if(!file) {

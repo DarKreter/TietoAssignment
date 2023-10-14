@@ -16,6 +16,6 @@ typedef struct {
 } CPUStats;
 
 float CalculateCpuUsage(CPUStats, CPUStats);
-short CheckCoreCount();
+short GetCoreCount();
 
 #endif	// CPU_TIETO_ASSIGNMENT
