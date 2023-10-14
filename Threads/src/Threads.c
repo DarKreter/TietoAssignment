@@ -6,7 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 
-void CheckAlive(pthread_mutex_t *watchdogMutex, short *alive, short i)
+static void CheckAlive(pthread_mutex_t *watchdogMutex, short *alive, short i)
 {
 	// Mark that thread is alive, so watchdog doesnt kill whole app
 	pthread_mutex_lock(watchdogMutex);
@@ -62,7 +62,7 @@ void *Analyzer(void *arg)
 	// buffer size is core count plus 1(to calc usage we need last measurment
 	// from same core)
 	int bufferSize	  = cc + 1;
-	int n;
+	long n;
 	float result;
 	int index = 0;
 	// First time fill bufor
@@ -93,7 +93,7 @@ void *Analyzer(void *arg)
 		pthread_cond_signal(args->condvar);
 	}
 
-	pthread_exit(NULL);
+	// pthread_exit(NULL);
 }
 
 void *Printer(void *arg)
@@ -111,14 +111,14 @@ void *Printer(void *arg)
 		printf("CPU USAGE:\n");
 		// Nicely print CPU usage
 		for(int i = 0; i < cc; i++)
-			printf("Cpu%i: %0.1f%%\n", i, args->cpus_usage[i]);
+			printf("Cpu%i: %0.1f%%\n", i, (double) args->cpus_usage[i]);
 
 		// Free mutex
 		pthread_mutex_unlock(args->analyzerPrinterMutex);
 		printf("\n");
 	}
 
-	pthread_exit(NULL);
+	// pthread_exit(NULL);
 }
 
 void *Watchdog(void *arg)
@@ -135,7 +135,7 @@ void *Watchdog(void *arg)
 				pthread_mutex_unlock(args->watchdogMutex);
 				// Someone is dead, execute order 66
 				printf("Killing app!\n");
-				for(int i = 0; i < THREADS_NUM; i++)
+				for(int j = 0; j < THREADS_NUM; j++)
 					pthread_cancel(args->threads[i]);
 
 				pthread_exit(NULL);
@@ -146,5 +146,5 @@ void *Watchdog(void *arg)
 		}
 	}
 
-	pthread_exit(NULL);
+	// pthread_exit(NULL);
 }

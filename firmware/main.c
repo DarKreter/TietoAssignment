@@ -10,13 +10,14 @@
 int main()
 {
 	// shared data between Analyzer and Printer
-	float *cpus_usage = malloc(sizeof(float) * GetCoreCount());
+	float *cpus_usage = malloc(sizeof(float) * (unsigned long) GetCoreCount());
 	pthread_mutex_t analyzerPrinterMutex, watchdogMutex;
 	pthread_cond_t analyzerPrinterCondvar;
 	// Analyzer data
-	CPUStats *cpus = malloc(sizeof(CPUStats) * (1 + GetCoreCount()));
+	CPUStats *cpus =
+		malloc(sizeof(CPUStats) * (1ul + (unsigned long) GetCoreCount()));
 	// Watchdog table
-	short *alive   = malloc(sizeof(short) * THREADS_NUM);
+	short *alive = malloc(sizeof(short) * THREADS_NUM);
 	alive[0] = alive[1] = alive[2] = alive[3] = 1;
 
 	// Config and init threads, attr, mutex and condvar
