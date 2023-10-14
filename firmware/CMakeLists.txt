@@ -1,4 +1,4 @@
-set(DEPENDENCIES_LIST CPU Threads::Threads)
+set(DEPENDENCIES_LIST CPU Threads::Threads Threads)
 
 add_executable(firmware main.c)
 

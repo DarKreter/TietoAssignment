@@ -11,4 +11,5 @@ add_compile_options(${CPU_OPTIONS})
 find_package(Threads REQUIRED)
 
 add_subdirectory(CPU)
+add_subdirectory(Threads)
 add_subdirectory(firmware)
