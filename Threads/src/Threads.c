@@ -35,44 +35,34 @@ void *Reader(void *_pipe)
 
 void *Analyzer(void *_pipe)
 {
-	int *pipefd	 = (int(*)) _pipe;
-	int cc		 = CheckCoreCount();
-	short parity = 1;
-	//, first = 1;
+	int *pipefd	   = (int(*)) _pipe;
+	int cc		   = CheckCoreCount();
+	int bufferSize = cc + 1;
 	int n;
 	float result;
-	CPUStats *cpus_1 = malloc(sizeof(CPUStats) * cc);
-	CPUStats *cpus_2 = malloc(sizeof(CPUStats) * cc);
-	CPUStats *curr = cpus_1, *prev = cpus_2;
+	CPUStats *cpus = malloc(sizeof(CPUStats) * bufferSize);
+	int index	   = 0;
 	// First time fill bufor
-	for(int i = 0; i < cc; i++) {
-		n = read(pipefd[0], &curr[i], sizeof(CPUStats));
-		if(n <= 0)
+	for(int i = 0; i < cc; i++, index = (index + 1) % bufferSize) {
+		n = read(pipefd[0], &cpus[index], sizeof(CPUStats));
+		if(n <= 0) {
+			free(cpus);
 			return NULL;
+		}
 	}
-
 	while(1) {
-		if(parity) {
-			curr   = cpus_2;
-			prev   = cpus_1;
-			parity = 0;
-		}
-		else {
-			curr   = cpus_1;
-			prev   = cpus_2;
-			parity = 1;
-		}
-		for(int i = 0; i < cc; i++) {
-			n = read(pipefd[0], &curr[i], sizeof(CPUStats));
+		for(int i = 0; i < cc; i++, index = (index + 1) % bufferSize) {
+			n = read(pipefd[0], &cpus[index], sizeof(CPUStats));
 			if(n <= 0)
 				break;
 
-
-			result = CalculateCpuUsage(prev[i], curr[i]);
-			printf("cpu%d: %f%%\n", curr[i].id, result);
+			result =
+				CalculateCpuUsage(cpus[(index + 1) % bufferSize], cpus[index]);
+			printf("cpu%d: %f%%\n", cpus[i].id, result);
 		}
 		printf("\n");
 	}
 
+	free(cpus);
 	return NULL;
 }
