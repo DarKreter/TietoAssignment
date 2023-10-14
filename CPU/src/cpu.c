@@ -5,6 +5,8 @@
 
 float CalculateCpuUsage(CPUStats prev, CPUStats curr)
 {
+	// Calculation based on:
+	// https://stackoverflow.com/questions/23367857/accurate-calculation-of-cpu-usage-given-in-percentage-in-linux
 	int PrevIdle = prev.idle + prev.iowait;
 	int Idle	 = curr.idle + curr.iowait;
 
@@ -24,6 +26,7 @@ float CalculateCpuUsage(CPUStats prev, CPUStats curr)
 
 short GetCoreCount()
 {
+	// Open /proc/cpuinfo
 	FILE *file = fopen("/proc/cpuinfo", "r");
 	if(!file) {
 		perror("Failed to open /proc/cpuinfo");
@@ -32,6 +35,7 @@ short GetCoreCount()
 	// Count number of cpu cores
 	short cores = 0;
 	char line[128];
+	// count processors
 	while(fgets(line, sizeof(line), file))
 		if(!strncmp(line, "processor", 9))
 			cores++;

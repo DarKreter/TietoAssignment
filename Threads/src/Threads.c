@@ -6,29 +6,36 @@
 #include <string.h>
 #include <unistd.h>
 
-
-
 void *Reader(void *_pipe)
 {
+	// Unpack arg
 	int *pipefd = (int *) (_pipe);
 	CPUStats cpu;
 	char buffer[128];
 
+	// Read data once a second
 	while(1) {
+		// Read file
 		FILE *file = fopen("/proc/stat", "r");
 		if(!file) {
 			perror("Can't read /proc/stat!");
 			exit(2);
 		}
+		// Read to buffer size or to new line
 		while(fgets(buffer, sizeof(buffer), file)) {
+			// If starts with 'cpuXX', its about one of the cores, but we need
+			// to omit 'cpu' line
 			if(!strncmp(buffer, "cpu", 3) && strncmp(buffer, "cpu ", 4)) {
+				// Parse data
 				sscanf(buffer, "cpu%d %d %d %d %d %d %d %d %d %d %d", &cpu.id,
 					   &cpu.user, &cpu.nice, &cpu.system, &cpu.idle,
 					   &cpu.iowait, &cpu.irq, &cpu.softirq, &cpu.steal,
 					   &cpu.guest, &cpu.guest_nice);
+				// Send them through pipe
 				write(pipefd[1], &cpu, sizeof(cpu));
 			}
 		}
+		// Close /proc/stat
 		fclose(file);
 
 		sleep(1);
@@ -39,8 +46,11 @@ void *Reader(void *_pipe)
 
 void *Analyzer(void *arg)
 {
+	// Unpack args and create necessary var
 	AnalyzerArgs *args = (AnalyzerArgs *) arg;
 	int cc			   = GetCoreCount();
+	// buffer size is core count plus 1(to calc usage we need last measurment
+	// from same core)
 	int bufferSize	   = cc + 1;
 	int n;
 	float result;
@@ -48,45 +58,55 @@ void *Analyzer(void *arg)
 	int index	   = 0;
 	// First time fill bufor
 	for(int i = 0; i < cc; i++, index = (index + 1) % bufferSize) {
+		// Read from pipe
 		n = read(args->pipefd[0], &cpus[index], sizeof(CPUStats));
-		if(n <= 0) {
+		if(n <= 0) {  // If pipe closes
 			free(cpus);
 			return NULL;
 		}
 	}
+	// continuously read from pipe
 	while(1) {
 		for(int i = 0; i < cc; i++, index = (index + 1) % bufferSize) {
 			n = read(args->pipefd[0], &cpus[index], sizeof(CPUStats));
-			if(n <= 0)
+			if(n <= 0)	// if pipe closes
 				break;
 
+			// calc usage with last record for same core
 			result =
 				CalculateCpuUsage(cpus[(index + 1) % bufferSize], cpus[index]);
+			// write usage into shared variable
 			pthread_mutex_lock(args->mutex);
 			args->cpus_usage[i] = result;
 			pthread_mutex_unlock(args->mutex);
 		}
+		// After whole set notify Printer
 		pthread_cond_signal(args->condvar);
 	}
-
+	// Free memory
 	free(cpus);
 	return NULL;
 }
 
 void *Printer(void *arg)
 {
+	// Unpack args
 	AnalyzerArgs *args = (AnalyzerArgs *) arg;
 	int cc			   = GetCoreCount();
 	while(1) {
+		// Before cond_wait, mutex must be locked
 		pthread_mutex_lock(args->mutex);
-
+		// Wait for signal
 		pthread_cond_wait(args->condvar, args->mutex);
 
+		printf("CPU USAGE:\n");
+		// Nicely print CPU usage
 		for(int i = 0; i < cc; i++)
 			printf("Cpu%i: %0.1f%%\n", i, args->cpus_usage[i]);
-		printf("\n");
 
+		// Free mutex
 		pthread_mutex_unlock(args->mutex);
+		printf("\n");
 	}
 
 	return NULL;
