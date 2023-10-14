@@ -2,56 +2,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "cpu.h"
 
-struct CPUStats{
-    int user;
-    int nice;
-    int system;
-    int idle;
-    int iowait;
-    int irq;
-    int softirq;
-    int steal;
-    int guest;
-    int guest_nice;
-};
 
-float CalculateCpuUsage(struct CPUStats prev, struct CPUStats curr)
+int main()
 {
-    int PrevIdle = prev.idle + prev.iowait;
-    int Idle = curr.idle + curr.iowait;
-    printf("%d %d\n", PrevIdle, Idle);
-
-    int PrevNonIdle = prev.user + prev.nice + prev.system + prev.irq + prev.softirq + prev.steal;
-    int NonIdle = curr.user + curr.nice + curr.system + curr.irq + curr.softirq + curr.steal;
-    printf("%d %d\n", PrevNonIdle, NonIdle);
-
-    int PrevTotal = PrevIdle + PrevNonIdle;
-    int Total = Idle + NonIdle;
-    printf("%d %d\n", PrevTotal, Total);
-
-    // differentiate: actual value minus the previous one
-    int totald = Total - PrevTotal;
-    int idled = Idle - PrevIdle;
-    printf("%d %d\n", totald, idled);
-
-    printf("%d\n", totald - idled);
-
-    float CPU_Percentage = 100*(totald - idled)/totald;
-
-    return CPU_Percentage;
-}
-
-
-int main(int argc, char** argv)
-{
+    CheckCoreCount();
+    return 0;
     FILE* file = fopen("/proc/stat", "r");
     if (!file) {
-        printf("Can't read /proc/stat!");
-        return 1;
+        perror("Can't read /proc/stat!");
+        return 2;
     }
 
-    struct CPUStats cpu, prev;
+    CPUStats cpu, prev;
     int i;
     char buffer[128];
     while (fgets(buffer, sizeof(buffer), file)) {
@@ -103,7 +67,7 @@ int main(int argc, char** argv)
             &cpu.guest_nice);
 
             printf("%s", buffer);
-            printf("%f\n", CalculateCpuUsage(prev, cpu));
+            printf("%f\n", CalculateCpuUsage(cpu));
             break;
         }
     }
