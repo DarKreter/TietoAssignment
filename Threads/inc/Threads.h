@@ -4,4 +4,4 @@
 void *Reader(void *);
 void *Analyzer(void *);
 
-#endif // THREADS_TIETO_ASSIGNMENT
+#endif	// THREADS_TIETO_ASSIGNMENT
