@@ -6,15 +6,25 @@
 #include <string.h>
 #include <unistd.h>
 
-void *Reader(void *_pipe)
+void CheckAlive(pthread_mutex_t *watchdogMutex, short *alive, short i)
+{
+	// Mark that thread is alive, so watchdog doesnt kill whole app
+	pthread_mutex_lock(watchdogMutex);
+	alive[i] = 1;
+	pthread_mutex_unlock(watchdogMutex);
+}
+
+void *Reader(void *arg)
 {
 	// Unpack arg
-	int *pipefd = (int *) (_pipe);
+	ThreadsArgs *args = (ThreadsArgs *) arg;
 	CPUStats cpu;
 	char buffer[128];
 
 	// Read data once a second
 	while(1) {
+		CheckAlive(args->watchdogMutex, args->alive, 0);
+
 		// Read file
 		FILE *file = fopen("/proc/stat", "r");
 		if(!file) {
@@ -32,12 +42,12 @@ void *Reader(void *_pipe)
 					   &cpu.iowait, &cpu.irq, &cpu.softirq, &cpu.steal,
 					   &cpu.guest, &cpu.guest_nice);
 				// Send them through pipe
-				write(pipefd[1], &cpu, sizeof(cpu));
+				write(args->pipefd[1], &cpu, sizeof(cpu));
 			}
 		}
 		// Close /proc/stat
 		fclose(file);
-
+		// write to watchdog
 		sleep(1);
 	}
 
@@ -47,57 +57,56 @@ void *Reader(void *_pipe)
 void *Analyzer(void *arg)
 {
 	// Unpack args and create necessary var
-	AnalyzerArgs *args = (AnalyzerArgs *) arg;
-	int cc			   = GetCoreCount();
+	ThreadsArgs *args = (ThreadsArgs *) arg;
+	int cc			  = GetCoreCount();
 	// buffer size is core count plus 1(to calc usage we need last measurment
 	// from same core)
-	int bufferSize	   = cc + 1;
+	int bufferSize	  = cc + 1;
 	int n;
 	float result;
-	CPUStats *cpus = malloc(sizeof(CPUStats) * bufferSize);
-	int index	   = 0;
+	int index = 0;
 	// First time fill bufor
 	for(int i = 0; i < cc; i++, index = (index + 1) % bufferSize) {
 		// Read from pipe
-		n = read(args->pipefd[0], &cpus[index], sizeof(CPUStats));
-		if(n <= 0) {  // If pipe closes
-			free(cpus);
+		n = read(args->pipefd[0], &args->cpus[index], sizeof(CPUStats));
+		if(n <= 0)
 			return NULL;
-		}
 	}
 	// continuously read from pipe
 	while(1) {
+		CheckAlive(args->watchdogMutex, args->alive, 1);
+
 		for(int i = 0; i < cc; i++, index = (index + 1) % bufferSize) {
-			n = read(args->pipefd[0], &cpus[index], sizeof(CPUStats));
+			n = read(args->pipefd[0], &args->cpus[index], sizeof(CPUStats));
 			if(n <= 0)	// if pipe closes
 				break;
 
 			// calc usage with last record for same core
-			result =
-				CalculateCpuUsage(cpus[(index + 1) % bufferSize], cpus[index]);
+			result = CalculateCpuUsage(args->cpus[(index + 1) % bufferSize],
+									   args->cpus[index]);
 			// write usage into shared variable
-			pthread_mutex_lock(args->mutex);
+			pthread_mutex_lock(args->analyzerPrinterMutex);
 			args->cpus_usage[i] = result;
-			pthread_mutex_unlock(args->mutex);
+			pthread_mutex_unlock(args->analyzerPrinterMutex);
 		}
 		// After whole set notify Printer
 		pthread_cond_signal(args->condvar);
 	}
-	// Free memory
-	free(cpus);
-	return NULL;
+
+	pthread_exit(NULL);
 }
 
 void *Printer(void *arg)
 {
 	// Unpack args
-	AnalyzerArgs *args = (AnalyzerArgs *) arg;
-	int cc			   = GetCoreCount();
+	ThreadsArgs *args = (ThreadsArgs *) arg;
+	int cc			  = GetCoreCount();
 	while(1) {
+		CheckAlive(args->watchdogMutex, args->alive, 2);
 		// Before cond_wait, mutex must be locked
-		pthread_mutex_lock(args->mutex);
+		pthread_mutex_lock(args->analyzerPrinterMutex);
 		// Wait for signal
-		pthread_cond_wait(args->condvar, args->mutex);
+		pthread_cond_wait(args->condvar, args->analyzerPrinterMutex);
 
 		printf("CPU USAGE:\n");
 		// Nicely print CPU usage
@@ -105,9 +114,37 @@ void *Printer(void *arg)
 			printf("Cpu%i: %0.1f%%\n", i, args->cpus_usage[i]);
 
 		// Free mutex
-		pthread_mutex_unlock(args->mutex);
+		pthread_mutex_unlock(args->analyzerPrinterMutex);
 		printf("\n");
 	}
 
-	return NULL;
+	pthread_exit(NULL);
+}
+
+void *Watchdog(void *arg)
+{
+	// Unpack args
+	ThreadsArgs *args = (ThreadsArgs *) arg;
+
+	while(1) {
+		sleep(2);
+		// Check if threads marked their existence
+		for(int i = 0; i < THREADS_NUM; i++) {
+			pthread_mutex_lock(args->watchdogMutex);
+			if(!args->alive[i]) {
+				pthread_mutex_unlock(args->watchdogMutex);
+				// Someone is dead, execute order 66
+				printf("Killing app!\n");
+				for(int i = 0; i < THREADS_NUM; i++)
+					pthread_cancel(args->threads[i]);
+
+				pthread_exit(NULL);
+			}
+			else  // Trust, but check
+				args->alive[i] = 0;
+			pthread_mutex_unlock(args->watchdogMutex);
+		}
+	}
+
+	pthread_exit(NULL);
 }
