@@ -23,7 +23,7 @@ int main()
 	FILE *lgfl								  = fopen("data.log", "w+");
 
 	// Config and init threads, attr, mutex and condvar
-	pthread_t threads[THREADS_NUM], watchdog, logger;
+	pthread_t threads[THREADS_NUM], watchdog;
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
@@ -37,31 +37,29 @@ int main()
 	pipe(pipeReaderAnalyzer);
 	pipe(pipeLogger);
 
+
 	// Pack args for threads
-	ThreadsArgs analyzerArgs = {pipeReaderAnalyzer,
-								pipeLogger,
-								&analyzerPrinterMutex,
-								&watchdogMutex,
-								&loggerMutex,
-								&analyzerPrinterCondvar,
-								cpus_usage,
-								cpus,
-								alive,
-								threads,
-								lgfl};
-	pthread_create(&threads[0], &attr, Reader, (void *) &analyzerArgs);
-	pthread_create(&threads[1], &attr, Analyzer, (void *) &analyzerArgs);
-	pthread_create(&threads[2], &attr, Printer, (void *) &analyzerArgs);
-	pthread_create(&logger, &attr, Logger, (void *) &analyzerArgs);
-	pthread_create(&watchdog, &attr, Watchdog, (void *) &analyzerArgs);
+	ThreadsArgs args = {pipeReaderAnalyzer,
+						pipeLogger,
+						&analyzerPrinterMutex,
+						&watchdogMutex,
+						&loggerMutex,
+						&analyzerPrinterCondvar,
+						cpus_usage,
+						cpus,
+						alive,
+						threads,
+						lgfl};
+	pthread_create(&threads[0], &attr, Reader, (void *) &args);
+	pthread_create(&threads[1], &attr, Analyzer, (void *) &args);
+	pthread_create(&threads[2], &attr, Printer, (void *) &args);
+	pthread_create(&threads[3], &attr, Logger, (void *) &args);
+	pthread_create(&watchdog, &attr, Watchdog, (void *) &args);
 
 	// Wait for threads
 	for(int i = 0; i < THREADS_NUM; i++)
 		pthread_join(threads[i], NULL);
 	pthread_join(watchdog, NULL);
-
-	pthread_cancel(logger);
-	pthread_join(logger, NULL);
 
 	// Clean up
 	fclose(lgfl);

@@ -1,5 +1,5 @@
-set(HEADER_LIST inc/Threads.h)
-set(SRC_LIST src/Threads.c)
+set(HEADER_LIST inc/Threads.h inc/utils.h)
+set(SRC_LIST src/Threads.c src/utils.c)
 set(DEPENDENCIES_LIST CPU)
 
 

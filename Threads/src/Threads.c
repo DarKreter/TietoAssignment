@@ -1,18 +1,12 @@
 #include "Threads.h"
 #include "cpu.h"
+#include "utils.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-static void CheckAlive(pthread_mutex_t *watchdogMutex, short *alive, short i)
-{
-	// Mark that thread is alive, so watchdog doesnt kill whole app
-	pthread_mutex_lock(watchdogMutex);
-	alive[i] = 1;
-	pthread_mutex_unlock(watchdogMutex);
-}
 
 void *Reader(void *arg)
 {
@@ -20,15 +14,19 @@ void *Reader(void *arg)
 	ThreadsArgs *args = (ThreadsArgs *) arg;
 	CPUStats cpu;
 	char buffer[128];
-
+	FILE *file;
 	// Read data once a second
 	while(1) {
-		CheckAlive(args->watchdogMutex, args->alive, 0);
+		if(CheckAlive(args->watchdogMutex, args->alive, 0)) {
+			close(args->pipeReadAnal[1]);
+			pthread_exit(NULL);
+		}
+
 		// Read file
-		FILE *file = fopen("/proc/stat", "r");
+		file = fopen("/proc/stat", "r");
 		if(!file) {
-			perror("Can't read /proc/stat!");
-			exit(2);
+			Log("Can't read /proc/stat!\n", args);
+			pthread_exit(NULL);
 		}
 		// Read to buffer size or to new line
 		while(fgets(buffer, sizeof(buffer), file)) {
@@ -73,7 +71,10 @@ void *Analyzer(void *arg)
 	}
 	// continuously read from pipe
 	while(1) {
-		// CheckAlive(args->watchdogMutex, args->alive, 1);
+		if(CheckAlive(args->watchdogMutex, args->alive, 1)) {
+			close(args->pipeReadAnal[0]);
+			pthread_exit(NULL);
+		}
 
 		for(int i = 0; i < cc; i++, index = (index + 1) % bufferSize) {
 			n = read(args->pipeReadAnal[0], &args->cpus[index],
@@ -102,7 +103,8 @@ void *Printer(void *arg)
 	ThreadsArgs *args = (ThreadsArgs *) arg;
 	int cc			  = GetCoreCount();
 	while(1) {
-		CheckAlive(args->watchdogMutex, args->alive, 2);
+		if(CheckAlive(args->watchdogMutex, args->alive, 2))
+			pthread_exit(NULL);
 		// Before cond_wait, mutex must be locked
 		pthread_mutex_lock(args->analyzerPrinterMutex);
 		// Wait for signal
@@ -136,20 +138,32 @@ void *Watchdog(void *arg)
 				pthread_mutex_unlock(args->watchdogMutex);
 
 				// Log inf
-				pthread_mutex_lock(args->loggerMutex);
-				char buff[128];
 
-				sprintf(
-					buff,
-					"Watchdog: Killing app, because of inactive thread '%d'.\n",
-					i);
-				write(args->pipeLogger[1], buff, strlen(buff));
-				pthread_mutex_unlock(args->loggerMutex);
+				Log("Watchdog: Killing app, because of inactive thread: ",
+					args);
+				LogInt(i, args);
+				Log("!\n", args);
 				sleep(1);
-
-				// Someone is dead, execute order 66
+				// Try to kill threads gracefully
+				pthread_mutex_lock(args->watchdogMutex);
 				for(int j = 0; j < THREADS_NUM; j++)
-					pthread_cancel(args->threads[j]);
+					args->alive[j] = -1;
+				pthread_mutex_unlock(args->watchdogMutex);
+				pthread_cond_signal(args->analyzerPrinterCondvar);
+				close(args->pipeLogger[1]);
+				sleep(2);
+				for(int j = 0; j < THREADS_NUM; j++)
+					if(args->alive[j] != -2)  // Force kill
+					{  // Someone is dead, execute order 66
+
+						Log("Can't kill threads gracefully, force killing (",
+							args);
+						LogInt(j, args);
+						Log(")!\n", args);
+						for(int j = 0; j < THREADS_NUM; j++)
+							pthread_cancel(args->threads[j]);
+						break;
+					}
 
 				pthread_exit(NULL);
 			}
@@ -167,12 +181,20 @@ void *Logger(void *arg)
 	// Unpack args
 	ThreadsArgs *args = (ThreadsArgs *) arg;
 	char buff;
+	int n;
 	if(!args->loggerFile) {
-		perror("Cant open data.log");
+		perror("Cant open data.log!\n");
 		pthread_exit(NULL);
 	}
 	while(1) {
-		read(args->pipeLogger[0], &buff, sizeof(char));
+		if(CheckAlive(args->watchdogMutex, args->alive, 3)) {
+			close(args->pipeLogger[0]);
+			pthread_exit(NULL);
+		}
+		n = read(args->pipeLogger[0], &buff, sizeof(char));
+		if(n <= 0)	// if pipe closes
+			continue;
+
 		fputc(buff, args->loggerFile);
 	}
 

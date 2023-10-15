@@ -5,7 +5,7 @@
 #include "pthread.h"
 #include <stdio.h>
 
-#define THREADS_NUM 3
+#define THREADS_NUM 4
 
 typedef struct {
 	int *pipeReadAnal;
