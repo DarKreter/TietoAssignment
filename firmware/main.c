@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
@@ -5,14 +6,44 @@
 #include <string.h>
 #include <unistd.h>
 
-
 #include "cpu.h"
 #include "Threads.h"
 #include "utils.h"
 
+void RunTests()
+{
+	assert(2 + 2 == 4);
+
+	CPUStats prev, curr;
+	prev.idle		= 5000;
+	prev.iowait		= 0;
+	prev.user		= 2500;
+	prev.nice		= 0;
+	prev.system		= 2500;
+	prev.irq		= 0;
+	prev.softirq	= 0;
+	prev.steal		= 0;
+	prev.guest		= 0;
+	prev.guest_nice = 0;
+	curr.idle		= 10000;
+	curr.iowait		= 0;
+	curr.user		= 5000;
+	curr.nice		= 0;
+	curr.system		= 5000;
+	curr.irq		= 0;
+	curr.softirq	= 0;
+	curr.steal		= 0;
+	curr.guest		= 0;
+	curr.guest_nice = 0;
+
+	assert(50. == CalculateCpuUsage(prev, curr));
+}
 
 int main()
 {
+	// Run tests
+	RunTests();
+
 	// shared data between Analyzer and Printer
 	float *cpus_usage = malloc(sizeof(float) * (unsigned long) GetCoreCount());
 	pthread_mutex_t analyzerPrinterMutex, watchdogMutex, loggerMutex;
@@ -83,6 +114,7 @@ int main()
 }
 
 // TODO:
-// SIGTERM handler
 // Add make tests
+// Test with gcc and clang
 // Test with valgrind
+// Add README
