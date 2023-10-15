@@ -7,6 +7,8 @@
 
 #define THREADS_NUM 4
 
+extern int terminate;
+
 typedef struct {
 	int *pipeReadAnal;
 	int *pipeLogger;

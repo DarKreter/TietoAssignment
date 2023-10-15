@@ -1,11 +1,15 @@
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
+
 #include "cpu.h"
 #include "Threads.h"
+#include "utils.h"
+
 
 int main()
 {
@@ -56,6 +60,9 @@ int main()
 	pthread_create(&threads[3], &attr, Logger, (void *) &args);
 	pthread_create(&watchdog, &attr, Watchdog, (void *) &args);
 
+	// Capture SIGTERM
+	signal(SIGTERM, Capture);
+
 	// Wait for threads
 	for(int i = 0; i < THREADS_NUM; i++)
 		pthread_join(threads[i], NULL);
@@ -79,4 +86,3 @@ int main()
 // SIGTERM handler
 // Add make tests
 // Test with valgrind
-// Add logger

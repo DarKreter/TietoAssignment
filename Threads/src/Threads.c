@@ -7,6 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 
+int terminate = 0;
 
 void *Reader(void *arg)
 {
@@ -124,6 +125,8 @@ void *Printer(void *arg)
 	// pthread_exit(NULL);
 }
 
+
+
 void *Watchdog(void *arg)
 {
 	// Unpack args
@@ -131,39 +134,26 @@ void *Watchdog(void *arg)
 
 	while(1) {
 		sleep(2);
+		if(terminate == 1) {
+			Log("Got SIGTERM, terminating app!", args);
+			sleep(1);
+			KillApp(args);
+
+			pthread_exit(NULL);
+		}
 		// Check if threads marked their existence
-		for(int i = 0; i < THREADS_NUM; i++) {
+		for(int i = 0; i < THREADS_NUM - 1; i++) {
 			pthread_mutex_lock(args->watchdogMutex);
 			if(!args->alive[i]) {
 				pthread_mutex_unlock(args->watchdogMutex);
 
 				// Log inf
-
 				Log("Watchdog: Killing app, because of inactive thread: ",
 					args);
 				LogInt(i, args);
 				Log("!\n", args);
 				sleep(1);
-				// Try to kill threads gracefully
-				pthread_mutex_lock(args->watchdogMutex);
-				for(int j = 0; j < THREADS_NUM; j++)
-					args->alive[j] = -1;
-				pthread_mutex_unlock(args->watchdogMutex);
-				pthread_cond_signal(args->analyzerPrinterCondvar);
-				close(args->pipeLogger[1]);
-				sleep(2);
-				for(int j = 0; j < THREADS_NUM; j++)
-					if(args->alive[j] != -2)  // Force kill
-					{  // Someone is dead, execute order 66
-
-						Log("Can't kill threads gracefully, force killing (",
-							args);
-						LogInt(j, args);
-						Log(")!\n", args);
-						for(int j = 0; j < THREADS_NUM; j++)
-							pthread_cancel(args->threads[j]);
-						break;
-					}
+				KillApp(args);
 
 				pthread_exit(NULL);
 			}
