@@ -2,6 +2,8 @@ Assignment from Tieto.
 
 Instruction are included in `Assignment.pdf`.
 
+Tested on **Ubuntu**.
+
 Build:
 ---
 ```

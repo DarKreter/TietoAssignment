@@ -1,0 +1,6 @@
+#ifndef TEST_TIETO_ASSIGNMENT
+#define TEST_TIETO_ASSIGNMENT
+
+void RunTests(void);
+
+#endif	// TEST_TIETO_ASSIGNMENT
