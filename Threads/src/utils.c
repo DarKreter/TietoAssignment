@@ -43,18 +43,18 @@ void KillApp(ThreadsArgs *args)
 {
 	// Try to kill threads gracefully
 	pthread_mutex_lock(args->watchdogMutex);
-	for(int j = 0; j < THREADS_NUM; j++)
-		args->alive[j] = -1;
+	for(int i = 0; i < THREADS_NUM; i++)
+		args->alive[i] = -1;
 	pthread_mutex_unlock(args->watchdogMutex);
 	pthread_cond_signal(args->analyzerPrinterCondvar);
 	close(args->pipeLogger[1]);
 	sleep(2);
-	for(int j = 0; j < THREADS_NUM; j++)
-		if(args->alive[j] != -2)  // Force kill
+	for(int i = 0; i < THREADS_NUM; i++)
+		if(args->alive[i] != -2)  // Force kill
 		{						  // Someone is dead, execute order 66
 
 			Log("Can't kill threads gracefully, force killing (", args);
-			LogInt(j, args);
+			LogInt(i, args);
 			Log(")!\n", args);
 			for(int j = 0; j < THREADS_NUM; j++)
 				pthread_cancel(args->threads[j]);

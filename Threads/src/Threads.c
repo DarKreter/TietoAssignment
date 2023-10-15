@@ -171,7 +171,7 @@ void *Logger(void *arg)
 	// Unpack args
 	ThreadsArgs *args = (ThreadsArgs *) arg;
 	char buff;
-	int n;
+	long n;
 	if(!args->loggerFile) {
 		perror("Cant open data.log!\n");
 		pthread_exit(NULL);

@@ -10,7 +10,7 @@
 #include "Threads.h"
 #include "utils.h"
 
-void RunTests()
+static void RunTests(void)
 {
 	assert(2 + 2 == 4);
 
@@ -36,7 +36,7 @@ void RunTests()
 	curr.guest		= 0;
 	curr.guest_nice = 0;
 
-	assert(50. == CalculateCpuUsage(prev, curr));
+	assert(50.f == CalculateCpuUsage(prev, curr));
 }
 
 int main()
@@ -114,7 +114,6 @@ int main()
 }
 
 // TODO:
-// Add make tests
 // Test with gcc and clang
 // Test with valgrind
 // Add README
